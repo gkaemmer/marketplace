@@ -133,11 +133,13 @@ export default class Account extends Component {
                 >
                   {isApproved ? "Approved" : "Approve Transfer"}
                 </button>
-                <button
-                  onClick={() => this.createAuction(hill.id, currentAccount)}
-                >
-                  Create Auction
-                </button>
+                {isApproved && (
+                  <button
+                    onClick={() => this.createAuction(hill.id, currentAccount)}
+                  >
+                    Create Auction
+                  </button>
+                )}
               </li>
             );
           })}
