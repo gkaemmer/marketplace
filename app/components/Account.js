@@ -9,6 +9,7 @@ export default class Account extends Component {
   @observable cryptoHills = [];
   @observable loadingHills = false;
   @observable cryptoHillsBalance = new BigNumber(0);
+  @observable approvedHills = [];
 
   async componentDidMount() {
     this.hillCoreInstance = await this.props.store.HillCore.deployed();
@@ -17,6 +18,7 @@ export default class Account extends Component {
     this.getCryptoHillsBalance();
     const blockWatcher = observe(this.props.store, "currentBlock", change => {
       this.getCryptoHillsBalance();
+      this.getApprovedHills();
     });
     const balanceWatcher = observe(this, "cryptoHillsBalance", change => {
       this.getCryptoHills();
@@ -81,6 +83,33 @@ export default class Account extends Component {
       });
   }
 
+  promiseify(events) {
+    return new Promise((resolve, reject) => {
+      events.get((err, res) => {
+        if (err) return reject(err);
+        return resolve(res);
+      });
+    });
+  }
+
+  async getApprovedHills() {
+    const events = this.hillCoreInstance.allEvents({
+      fromBlock: 0,
+      toBlock: this.props.store.currentBlock
+    });
+    let allEvents = await this.promiseify(events);
+    allEvents = allEvents.filter(event => event.event === "Approval");
+
+    action(() => {
+      this.approvedHills.clear();
+
+      allEvents.forEach(event => {
+        if (event.args.owner === this.props.store.currentAccount)
+          this.approvedHills.push(event.args.tokenId);
+      });
+    })();
+  }
+
   render() {
     const { currentAccount } = this.props.store;
     return (
@@ -89,22 +118,29 @@ export default class Account extends Component {
         <div>
           Crypto Hills Balance: {this.cryptoHillsBalance.toString()} Hills
         </div>
+        Approved: {this.approvedHills.join(", ")}
         <ul>
-          {this.cryptoHills.map(hill => (
-            <li key={hill.id.toString()}>
-              {JSON.stringify(hill)}{" "}
-              <button
-                onClick={() => this.approveTransfer(hill.id, currentAccount)}
-              >
-                Approve Transfer
-              </button>
-              <button
-                onClick={() => this.createAuction(hill.id, currentAccount)}
-              >
-                Create Auction
-              </button>
-            </li>
-          ))}
+          {this.cryptoHills.map(hill => {
+            const isApproved = this.approvedHills
+              .map(a => a.toString())
+              .includes(hill.id.toString());
+            return (
+              <li key={hill.id.toString()}>
+                {JSON.stringify(hill)}{" "}
+                <button
+                  onClick={() => this.approveTransfer(hill.id, currentAccount)}
+                  disabled={isApproved}
+                >
+                  {isApproved ? "Approved" : "Approve Transfer"}
+                </button>
+                <button
+                  onClick={() => this.createAuction(hill.id, currentAccount)}
+                >
+                  Create Auction
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </div>
     );
