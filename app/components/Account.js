@@ -16,13 +16,23 @@ export default class Account extends Component {
     this.auction = await this.props.store.AuctionBase.deployed();
     window.s = this;
     this.getCryptoHillsBalance();
-    const blockWatcher = observe(this.props.store, "currentBlock", change => {
-      this.getCryptoHillsBalance();
-      this.getApprovedHills();
-    });
-    const balanceWatcher = observe(this, "cryptoHillsBalance", change => {
-      this.getCryptoHills();
-    });
+    const blockWatcher = observe(
+      this.props.store,
+      "currentBlock",
+      change => {
+        this.getCryptoHillsBalance();
+        this.getApprovedHills();
+      },
+      true
+    );
+    const balanceWatcher = observe(
+      this,
+      "cryptoHillsBalance",
+      change => {
+        this.getCryptoHills();
+      },
+      true
+    );
   }
 
   @action
@@ -97,17 +107,16 @@ export default class Account extends Component {
       fromBlock: 0,
       toBlock: this.props.store.currentBlock
     });
-    let allEvents = await this.promiseify(events);
-    allEvents = allEvents.filter(event => event.event === "Approval");
+    const allEvents = await this.promiseify(events);
+    const tokenIds = allEvents
+      .filter(
+        event =>
+          event.event === "Approval" &&
+          event.args.owner === this.props.store.currentAccount
+      )
+      .map(event => event.args.tokenId);
 
-    action(() => {
-      this.approvedHills.clear();
-
-      allEvents.forEach(event => {
-        if (event.args.owner === this.props.store.currentAccount)
-          this.approvedHills.push(event.args.tokenId);
-      });
-    })();
+    this.approvedHills.replace(tokenIds.map(id => id.toString()));
   }
 
   render() {
@@ -118,12 +127,9 @@ export default class Account extends Component {
         <div>
           Crypto Hills Balance: {this.cryptoHillsBalance.toString()} Hills
         </div>
-        Approved: {this.approvedHills.join(", ")}
         <ul>
           {this.cryptoHills.map(hill => {
-            const isApproved = this.approvedHills
-              .map(a => a.toString())
-              .includes(hill.id.toString());
+            const isApproved = this.approvedHills.includes(hill.id.toString());
             return (
               <li key={hill.id.toString()}>
                 {JSON.stringify(hill)}{" "}
